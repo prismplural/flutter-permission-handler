@@ -1,0 +1,76 @@
+name: windows_lazy_geolocator_check
+
+on:
+  push:
+    branches:
+      - ci/windows-lazy-geolocator
+  workflow_dispatch:
+
+jobs:
+  windows-build-and-smoke:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install package dependencies
+        working-directory: permission_handler_windows
+        run: flutter pub get
+
+      - name: Analyze package
+        working-directory: permission_handler_windows
+        run: flutter analyze
+
+      - name: Build Windows example
+        working-directory: permission_handler_windows/example
+        run: flutter build windows --release
+
+      - name: Run example and inspect location access registry
+        working-directory: permission_handler_windows/example
+        run: |
+          $exe = Resolve-Path "build/windows/x64/runner/Release/permission_handler_windows_example.exe"
+          $locationRoot = "HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location"
+
+          function Get-LocationEntries {
+            if (!(Test-Path $locationRoot)) {
+              return @()
+            }
+            Get-ChildItem $locationRoot -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.Name -like "*permission_handler_windows_example*" } |
+              ForEach-Object {
+                $item = Get-ItemProperty $_.PsPath
+                [pscustomobject]@{
+                  Name = $_.Name
+                  LastUsedTimeStart = $item.LastUsedTimeStart
+                  LastUsedTimeStop = $item.LastUsedTimeStop
+                }
+              }
+          }
+
+          $before = @(Get-LocationEntries)
+          Write-Host "Location registry entries before launch: $($before.Count)"
+
+          $process = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          if (!$process.HasExited) {
+            Stop-Process -Id $process.Id -Force
+            $process.WaitForExit()
+          }
+
+          $after = @(Get-LocationEntries)
+          Write-Host "Location registry entries after launch: $($after.Count)"
+          $after | ConvertTo-Json -Depth 4
+
+          if ($after.Count -gt $before.Count) {
+            throw "Launching the Windows example added a location access registry entry."
+          }

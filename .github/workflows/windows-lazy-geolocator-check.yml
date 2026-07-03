@@ -43,8 +43,10 @@ jobs:
           $png = [Convert]::FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
           )
+          $assetDir = Join-Path $template.FullName "lib"
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
           foreach ($name in @("logo.png", "poweredByBaseflow.png")) {
-            $target = Join-Path $template.FullName $name
+            $target = Join-Path $assetDir $name
             if (!(Test-Path $target)) {
               [IO.File]::WriteAllBytes($target, $png)
             }

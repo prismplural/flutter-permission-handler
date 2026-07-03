@@ -60,7 +60,6 @@ jobs:
         working-directory: permission_handler_windows/example
         run: |
           $exe = Get-ChildItem "build/windows" -Recurse -Filter "*.exe" |
-            Where-Object { $_.Name -like "*permission_handler_windows_example*" } |
             Select-Object -First 1
           if ($null -eq $exe) {
             Get-ChildItem "build/windows" -Recurse | Select-Object FullName

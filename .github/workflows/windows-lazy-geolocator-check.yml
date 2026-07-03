@@ -31,6 +31,25 @@ jobs:
         working-directory: permission_handler_windows
         run: flutter analyze
 
+      - name: Patch missing example template assets
+        run: |
+          $template = Get-ChildItem "$env:LOCALAPPDATA\Pub\Cache\hosted\pub.dev" -Directory |
+            Where-Object { $_.Name -like "baseflow_plugin_template-*" } |
+            Select-Object -First 1
+          if ($null -eq $template) {
+            throw "baseflow_plugin_template was not found in the pub cache."
+          }
+
+          $png = [Convert]::FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+          )
+          foreach ($name in @("logo.png", "poweredByBaseflow.png")) {
+            $target = Join-Path $template.FullName $name
+            if (!(Test-Path $target)) {
+              [IO.File]::WriteAllBytes($target, $png)
+            }
+          }
+
       - name: Build Windows example
         working-directory: permission_handler_windows/example
         run: flutter build windows --release

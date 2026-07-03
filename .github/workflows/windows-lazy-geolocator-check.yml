@@ -59,7 +59,13 @@ jobs:
       - name: Run example and inspect location access registry
         working-directory: permission_handler_windows/example
         run: |
-          $exe = Resolve-Path "build/windows/x64/runner/Release/permission_handler_windows_example.exe"
+          $exe = Get-ChildItem "build/windows" -Recurse -Filter "*.exe" |
+            Where-Object { $_.Name -like "*permission_handler_windows_example*" } |
+            Select-Object -First 1
+          if ($null -eq $exe) {
+            Get-ChildItem "build/windows" -Recurse | Select-Object FullName
+            throw "Could not find the built Windows example executable."
+          }
           $locationRoot = "HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location"
 
           function Get-LocationEntries {
@@ -81,7 +87,7 @@ jobs:
           $before = @(Get-LocationEntries)
           Write-Host "Location registry entries before launch: $($before.Count)"
 
-          $process = Start-Process -FilePath $exe -PassThru
+          $process = Start-Process -FilePath $exe.FullName -PassThru
           Start-Sleep -Seconds 8
           if (!$process.HasExited) {
             Stop-Process -Id $process.Id -Force
